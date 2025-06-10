@@ -1,82 +1,47 @@
 import streamlit as st
 from PIL import Image
 import pytesseract
-pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
-
 import requests
 import openai
 
-# === OCR 함수 ===
-def extract_text_from_image(image: Image.Image) -> str:
-    return pytesseract.image_to_string(image, lang="kor").strip()
+# Cloud용 tesseract 경로 설정
+pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
 
-# === 공공데이터 포털 API 호출 ===
-def search_drug_info_by_name(drug_name: str, api_key: str) -> dict:
-    url = "https://apis.data.go.kr/1471000/DrbEasyDrugInfoService/getDrbEasyDrugList"
-    params = {
-        "serviceKey": api_key,
-        "itemName": drug_name,
-        "type": "json",
-        "numOfRows": 1,
-        "pageNo": 1
-    }
-    res = requests.get(url, params=params)
-    data = res.json()
-    if data.get("body") and data["body"].get("items"):
-        return data["body"]["items"][0]
-    else:
-        return {"error": "약 정보를 찾을 수 없습니다."}
-
-# === GPT 요약 함수 ===
-def generate_gpt_guidance(drug_info: dict, openai_key: str) -> str:
-    openai.api_key = openai_key
-    summary = f"""
-    효능: {drug_info.get('efcyQesitm', '정보 없음')}
-    복용법: {drug_info.get('useMethodQesitm', '정보 없음')}
-    주의사항: {drug_info.get('atpnQesitm', '정보 없음')}
-    부작용: {drug_info.get('seQesitm', '정보 없음')}
-    병용금기: {drug_info.get('intrcQesitm', '정보 없음')}
-    """
-    messages = [
-        {"role": "system", "content": "너는 약사야. 사용자가 복용할 약 정보를 친절하고 쉽게 설명해줘."},
-        {"role": "user", "content": f"이 약 정보를 사용자에게 알기 쉽게 설명해줘:\n{summary}"}
-    ]
-    response = openai.ChatCompletion.create(model="gpt-4", messages=messages)
-    return response["choices"][0]["message"]["content"]
-
-# === Streamlit UI ===
-st.set_page_config(page_title="약사봇", page_icon="💊")
-st.title("💊 약사봇 - 사진으로 약 분석하기")
-
-# --- API 키 입력 ---
-st.sidebar.header("🔐 API 키 입력")
+# API 키 입력
+st.sidebar.title("API 키 입력")
 openai_key = st.sidebar.text_input("OpenAI API Key", type="password")
-drug_api_key = st.sidebar.text_input("공공데이터 포털 API Key", type="password")
+drug_api_key = st.sidebar.text_input("공공데이터 API Key", type="password")
 
 if not openai_key or not drug_api_key:
-    st.warning("왼쪽 사이드바에 API 키를 입력해주세요.")
-else:
-    uploaded_file = st.file_uploader("📸 약 성분이 적힌 사진을 올려주세요", type=["jpg", "jpeg", "png"])
+    st.warning("API 키를 입력하세요.")
+    st.stop()
 
-    if uploaded_file:
-        image = Image.open(uploaded_file)
-        st.image(image, caption="업로드한 이미지", use_column_width=True)
+uploaded_file = st.file_uploader("약 사진 업로드", type=["jpg", "jpeg", "png"])
+if uploaded_file:
+    image = Image.open(uploaded_file)
+    st.image(image, caption="업로드된 이미지", use_column_width=True)
+    text = pytesseract.image_to_string(image, lang="eng+kor")
+    st.text_area("OCR 결과", text, height=150)
 
-        with st.spinner("🧠 텍스트 인식 중..."):
-            text = extract_text_from_image(image)
-            st.write("🔤 인식된 텍스트:", text)
-
-        with st.spinner("💊 의약품 정보 확인 중..."):
-            drug_info = search_drug_info_by_name(text, drug_api_key)
-            if "error" in drug_info:
-                st.error(drug_info["error"])
+    if st.button("약 정보 분석"):
+        st.write("📦 약 이름으로 공공 API 조회 중...")
+        # 예시: 공공 API에서 검색
+        query = text.strip().split("\n")[0]
+        api_url = f"https://apis.data.go.kr/1471000/DrbEasyDrugInfoService/getDrbEasyDrugList?serviceKey={drug_api_key}&itemName={query}&type=json"
+        response = requests.get(api_url)
+        if response.ok:
+            items = response.json().get("body", {}).get("items", [])
+            if items:
+                item = items[0]
+                st.subheader(item["itemName"])
+                prompt = f"다음은 약 정보입니다: {item['efcyQesitm']}\n이 약의 복용 주의사항을 요약해줘."
+                openai.api_key = openai_key
+                chat = openai.ChatCompletion.create(
+                    model="gpt-3.5-turbo",
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                st.info(chat.choices[0].message["content"])
             else:
-                st.subheader("📋 의약품 기본 정보")
-                st.write("**효능**:", drug_info["efcyQesitm"])
-                st.write("**복용법**:", drug_info["useMethodQesitm"])
-                st.write("**주의사항**:", drug_info["atpnQesitm"])
-
-                with st.spinner("🤖 AI 설명 생성 중..."):
-                    gpt_text = generate_gpt_guidance(drug_info, openai_key)
-                    st.subheader("👩‍⚕️ 복용 안내 (AI 설명)")
-                    st.write(gpt_text)
+                st.error("약 정보를 찾을 수 없습니다.")
+        else:
+            st.error("API 요청 실패")
