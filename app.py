@@ -42,7 +42,8 @@ uploaded_file = st.file_uploader("약 사진을 업로드하세요 (jpg, jpeg, p
 
 if uploaded_file:
     image = Image.open(uploaded_file)
-    st.image(image, caption="업로드된 약 사진", use_column_width=True)
+    st.image(image, caption="업로드된 약 사진", use_container_width=True)
+
 
     text = pytesseract.image_to_string(image, lang="eng+kor")
     st.text_area("OCR 결과 (인식된 텍스트)", text, height=150)
