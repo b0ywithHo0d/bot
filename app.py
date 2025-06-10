@@ -49,7 +49,7 @@ if uploaded_file:
     st.write(f"인식된 약 이름(첫 줄): {query}")
 
     if st.button("약 정보 조회 및 GPT 설명"):
-        api_url = f"https://apis.data.go.kr/1471000/DrbEasyDrugInfoService/getDrbEasyDrugList?serviceKey={drug_api_key}&itemName={query}&type=json"
+        api_url = f"http://apis.data.go.kr/1471000/DrbEasyDrugInfoService/getDrbEasyDrugList?serviceKey={drug_api_key}&itemName={query}&type=json"
 
         try:
             session = requests.Session()
