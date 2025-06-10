@@ -1,6 +1,8 @@
 import streamlit as st
 from PIL import Image
 import pytesseract
+pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
+
 import requests
 import openai
 
