@@ -8,6 +8,7 @@ import ssl
 from requests.adapters import HTTPAdapter
 from urllib3.poolmanager import PoolManager
 
+response = requests.get(api_url, verify=False)
 # SSL 경고 무시 (verify=False 안쓰니까 필요없을 수도 있지만 일단 유지)
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
