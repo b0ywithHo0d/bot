@@ -4,6 +4,12 @@ import pytesseract
 import requests
 import openai
 
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+response = requests.get(api_url, verify=False)
+
+
 # Cloud용 tesseract 경로 설정
 pytesseract.pytesseract.tesseract_cmd = "/usr/bin/tesseract"
 
